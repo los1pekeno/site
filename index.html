@@ -134,3 +134,180 @@ renderChecks();renderTimeline();updateProgress();
 </script>
 </body>
 </html>
+
+
+<!-- BLOCO DE NOTAS INDEPENDENTE -->
+<section id="bloco-notas" style="max-width:900px;margin:30px auto;padding:20px;font-family:Arial,sans-serif;color:#17324d;">
+  <div style="background:#fff;border:1px solid #dce6ee;border-radius:18px;padding:22px;box-shadow:0 5px 20px #17324d10;">
+    <h2 style="margin-top:0;">📝 Meu Bloco de Notas</h2>
+    <p style="color:#607487;">Anote qualquer coisa que quiser. Suas ideias ficam guardadas neste dispositivo.</p>
+
+    <input id="nota-titulo" type="text" placeholder="Título da anotação..."
+      style="width:100%;box-sizing:border-box;padding:13px;border:1px solid #dce6ee;border-radius:10px;margin:8px 0;font-size:16px;">
+
+    <textarea id="nota-texto" placeholder="Escreva aqui suas ideias, lembretes, pensamentos..."
+      style="width:100%;height:220px;box-sizing:border-box;padding:13px;border:1px solid #dce6ee;border-radius:10px;margin:8px 0;font-size:16px;resize:vertical;font-family:inherit;"></textarea>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px;">
+      <button onclick="salvarNota()" style="background:#167c73;color:white;border:0;border-radius:10px;padding:12px 18px;font-size:15px;cursor:pointer;">💾 Salvar anotação</button>
+      <button onclick="limparEditor()" style="background:#e9f0f6;color:#17324d;border:0;border-radius:10px;padding:12px 18px;font-size:15px;cursor:pointer;">Nova anotação</button>
+    </div>
+
+    <input id="nota-busca" type="search" placeholder="🔎 Procurar uma anotação..."
+      oninput="mostrarNotas()"
+      style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #dce6ee;border-radius:10px;margin-bottom:14px;font-size:15px;">
+
+    <h3>Minhas anotações</h3>
+    <div id="lista-notas"></div>
+  </div>
+</section>
+
+<script>
+const CHAVE_NOTAS = "meuBlocoDeNotasLivre";
+let notaEditando = null;
+
+function lerNotas() {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_NOTAS) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function salvarBanco(notas) {
+  try {
+    localStorage.setItem(CHAVE_NOTAS, JSON.stringify(notas));
+    return true;
+  } catch {
+    alert("Não foi possível salvar. Verifique o espaço disponível no navegador.");
+    return false;
+  }
+}
+
+function salvarNota() {
+  const titulo = document.getElementById("nota-titulo").value.trim();
+  const texto = document.getElementById("nota-texto").value.trim();
+
+  if (!titulo && !texto) {
+    alert("Escreva um título ou alguma anotação primeiro!");
+    return;
+  }
+
+  const notas = lerNotas();
+  const agora = new Date().toISOString();
+
+  if (notaEditando !== null) {
+    const indice = notas.findIndex(n => n.id === notaEditando);
+    if (indice !== -1) {
+      notas[indice].titulo = titulo || "Sem título";
+      notas[indice].texto = texto;
+      notas[indice].atualizada = agora;
+    }
+  } else {
+    notas.unshift({
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      titulo: titulo || "Sem título",
+      texto: texto,
+      criada: agora,
+      atualizada: agora
+    });
+  }
+
+  if (salvarBanco(notas)) {
+    limparEditor();
+    mostrarNotas();
+  }
+}
+
+function limparEditor() {
+  document.getElementById("nota-titulo").value = "";
+  document.getElementById("nota-texto").value = "";
+  notaEditando = null;
+  const botao = document.querySelector('#bloco-notas button');
+  botao.textContent = "💾 Salvar anotação";
+}
+
+function editarNota(id) {
+  const nota = lerNotas().find(n => n.id === id);
+  if (!nota) return;
+
+  notaEditando = id;
+  document.getElementById("nota-titulo").value = nota.titulo;
+  document.getElementById("nota-texto").value = nota.texto;
+  document.querySelector('#bloco-notas button').textContent = "💾 Atualizar anotação";
+  document.getElementById("nota-titulo").focus();
+  document.getElementById("bloco-notas").scrollIntoView({behavior:"smooth"});
+}
+
+function excluirNota(id) {
+  if (!confirm("Deseja excluir esta anotação?")) return;
+
+  const notas = lerNotas().filter(n => n.id !== id);
+  if (salvarBanco(notas)) {
+    if (notaEditando === id) limparEditor();
+    mostrarNotas();
+  }
+}
+
+function mostrarNotas() {
+  const lista = document.getElementById("lista-notas");
+  const busca = document.getElementById("nota-busca").value.toLowerCase().trim();
+
+  const notas = lerNotas().filter(n =>
+    (n.titulo + " " + n.texto).toLowerCase().includes(busca)
+  );
+
+  lista.replaceChildren();
+
+  if (!notas.length) {
+    const vazio = document.createElement("p");
+    vazio.textContent = busca
+      ? "Nenhuma anotação encontrada."
+      : "Seu caderno está vazio. Escreva sua primeira anotação acima! ✍️";
+    vazio.style.color = "#607487";
+    lista.appendChild(vazio);
+    return;
+  }
+
+  notas.sort((a, b) =>
+    new Date(b.atualizada || b.criada) - new Date(a.atualizada || a.criada)
+  );
+
+  notas.forEach(nota => {
+    const cartao = document.createElement("article");
+    cartao.style.cssText = "border:1px solid #dce6ee;border-radius:12px;padding:15px;margin:12px 0;background:#f9fbfd;";
+
+    const titulo = document.createElement("h4");
+    titulo.textContent = nota.titulo;
+    titulo.style.cssText = "margin:0 0 8px;font-size:17px;";
+
+    const data = document.createElement("small");
+    data.textContent = "Atualizada em " + new Date(nota.atualizada || nota.criada).toLocaleString("pt-BR");
+    data.style.color = "#607487";
+
+    const texto = document.createElement("p");
+    texto.textContent = nota.texto;
+    texto.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;";
+
+    const botoes = document.createElement("div");
+    botoes.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;";
+
+    const editar = document.createElement("button");
+    editar.textContent = "✏️ Editar";
+    editar.style.cssText = "border:0;border-radius:8px;padding:9px 12px;background:#e4efff;cursor:pointer;";
+    editar.onclick = () => editarNota(nota.id);
+
+    const excluir = document.createElement("button");
+    excluir.textContent = "🗑️ Excluir";
+    excluir.style.cssText = "border:0;border-radius:8px;padding:9px 12px;background:#ffe9e9;color:#8a2424;cursor:pointer;";
+    excluir.onclick = () => excluirNota(nota.id);
+
+    botoes.append(editar, excluir);
+    cartao.append(titulo, data, texto, botoes);
+    lista.appendChild(cartao);
+  });
+}
+
+mostrarNotas();
+</script>
+<!-- FIM DO BLOCO DE NOTAS -->
