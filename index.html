@@ -311,3 +311,169 @@ function mostrarNotas() {
 mostrarNotas();
 </script>
 <!-- FIM DO BLOCO DE NOTAS -->
+
+
+
+<section id="lugares" style="max-width:900px;margin:30px auto;padding:20px;font-family:Arial,sans-serif;color:#17324d">
+  <div style="background:white;border:1px solid #dce6ee;border-radius:18px;padding:20px">
+    <h2>📍 Lugares para conhecer</h2>
+    <p>Vamos guardar os destinos das nossas próximas aventuras! ❤️</p>
+
+    <label for="lugar-nome">Nome do local</label>
+    <input id="lugar-nome" placeholder="Ex.: Cachoeira do Roncador" style="width:100%;box-sizing:border-box;padding:12px;margin:7px 0 14px;border:1px solid #dce6ee;border-radius:9px">
+
+    <label for="lugar-endereco">Endereço ou localização</label>
+    <input id="lugar-endereco" placeholder="Cidade, endereço ou link do Maps" style="width:100%;box-sizing:border-box;padding:12px;margin:7px 0 14px;border:1px solid #dce6ee;border-radius:9px">
+
+    <label for="lugar-fotos">Fotos do local</label>
+    <input id="lugar-fotos" type="file" accept="image/*" multiple style="display:block;width:100%;margin:10px 0 14px">
+
+    <label for="lugar-notas">Observações</label>
+    <textarea id="lugar-notas" placeholder="Preço, distância, estrada, horário..." style="width:100%;height:100px;box-sizing:border-box;padding:12px;margin:7px 0 14px;border:1px solid #dce6ee;border-radius:9px;font:inherit"></textarea>
+
+    <button onclick="salvarLugar()" style="padding:12px 18px;background:#167c73;color:white;border:0;border-radius:9px;font-weight:bold">💾 Salvar lugar</button>
+
+    <hr style="border:0;border-top:1px solid #dce6ee;margin:22px 0">
+    <h3>❤️ Nossa lista de destinos</h3>
+    <div id="lista-lugares"></div>
+  </div>
+</section>
+
+<script>
+const CHAVE_LUGARES = "nossoPasseioLugaresV1";
+
+function lerLugares() {
+  try {
+    return JSON.parse(localStorage.getItem(CHAVE_LUGARES) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function salvarLugares(lista) {
+  localStorage.setItem(CHAVE_LUGARES, JSON.stringify(lista));
+}
+
+async function salvarLugar() {
+  const nome = document.getElementById("lugar-nome").value.trim();
+  const endereco = document.getElementById("lugar-endereco").value.trim();
+  const notas = document.getElementById("lugar-notas").value.trim();
+  const arquivos = [...document.getElementById("lugar-fotos").files];
+
+  if (!nome) {
+    alert("Digite o nome do lugar!");
+    return;
+  }
+
+  if (arquivos.length > 5) {
+    alert("Escolha no máximo 5 fotos por vez.");
+    return;
+  }
+
+  try {
+    const fotos = await Promise.all(arquivos.map(arquivo => {
+      if (!arquivo.type.startsWith("image/")) {
+        throw new Error("Escolha apenas arquivos de imagem.");
+      }
+      if (arquivo.size > 1.5 * 1024 * 1024) {
+        throw new Error("Cada foto deve ter até 1,5 MB. Reduza o tamanho e tente novamente.");
+      }
+      return new Promise((resolve, reject) => {
+        const leitor = new FileReader();
+        leitor.onload = () => resolve(leitor.result);
+        leitor.onerror = () => reject(new Error("Não foi possível ler uma foto."));
+        leitor.readAsDataURL(arquivo);
+      });
+    }));
+
+    const lugares = lerLugares();
+    lugares.unshift({
+      id: Date.now().toString(),
+      nome,
+      endereco,
+      notas,
+      fotos,
+      data: new Date().toLocaleDateString("pt-BR")
+    });
+
+    salvarLugares(lugares);
+    document.getElementById("lugar-nome").value = "";
+    document.getElementById("lugar-endereco").value = "";
+    document.getElementById("lugar-notas").value = "";
+    document.getElementById("lugar-fotos").value = "";
+    mostrarLugares();
+    alert("Lugar salvo com sucesso! ❤️");
+  } catch (erro) {
+    alert(erro.message || "Não foi possível salvar. Tente fotos menores.");
+  }
+}
+
+function mostrarLugares() {
+  const lista = document.getElementById("lista-lugares");
+  lista.replaceChildren();
+
+  const lugares = lerLugares();
+
+  if (!lugares.length) {
+    lista.textContent = "Nenhum destino salvo ainda. Adicione o primeiro! 🌎";
+    return;
+  }
+
+  lugares.forEach(lugar => {
+    const cartao = document.createElement("article");
+    cartao.style.cssText = "border:1px solid #dce6ee;border-radius:12px;padding:14px;margin:14px 0;overflow-wrap:anywhere";
+
+    const titulo = document.createElement("h3");
+    titulo.textContent = "📍 " + lugar.nome;
+    cartao.appendChild(titulo);
+
+    if (lugar.fotos?.length) {
+      const galeria = document.createElement("div");
+      galeria.style.cssText = "display:flex;gap:8px;overflow-x:auto;margin:10px 0";
+      lugar.fotos.forEach(src => {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "Foto de " + lugar.nome;
+        img.style.cssText = "width:180px;height:130px;object-fit:cover;border-radius:9px;flex-shrink:0";
+        galeria.appendChild(img);
+      });
+      cartao.appendChild(galeria);
+    }
+
+    const endereco = document.createElement("p");
+    endereco.textContent = "Localização: " + (lugar.endereco || "Não informada");
+    cartao.appendChild(endereco);
+
+    if (lugar.endereco && /^https?:\/\//i.test(lugar.endereco)) {
+      const link = document.createElement("a");
+      link.href = lugar.endereco;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "🗺️ Abrir localização";
+      cartao.appendChild(link);
+    }
+
+    const notas = document.createElement("p");
+    notas.style.whiteSpace = "pre-wrap";
+    notas.textContent = lugar.notas || "Sem observações.";
+    cartao.appendChild(notas);
+
+    const data = document.createElement("small");
+    data.textContent = "Adicionado em " + lugar.data;
+    cartao.appendChild(data);
+
+    const excluir = document.createElement("button");
+    excluir.textContent = "🗑️ Excluir lugar";
+    excluir.style.cssText = "display:block;margin-top:12px;padding:10px;border:0;border-radius:8px;background:#ffe9e9;color:#8a2424";
+    excluir.onclick = () => {
+      if (!confirm("Deseja excluir este lugar e suas fotos?")) return;
+      salvarLugares(lerLugares().filter(item => item.id !== lugar.id));
+      mostrarLugares();
+    };
+    cartao.appendChild(excluir);
+    lista.appendChild(cartao);
+  });
+}
+
+mostrarLugares();
+</script>
